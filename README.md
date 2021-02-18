@@ -4,5 +4,5 @@ koro.che: simple URL shortener.
 
 Team members:
  - Nikita Bosov
- - Olga Shimanskaya
+ - Olga Shimanskaia
  - Andrey Kislitsyn
