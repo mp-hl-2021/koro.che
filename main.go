@@ -32,9 +32,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	{
-		panic(err)
-	}
 }
 
 func redirectToRealLink(writer http.ResponseWriter, request *http.Request) {
@@ -81,7 +78,7 @@ func shortenLink(writer http.ResponseWriter, request *http.Request) {
 }
 
 type registrationModel struct {
-	Login string `json:"login"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
@@ -96,7 +93,7 @@ func register(writer http.ResponseWriter, request *http.Request) {
 }
 
 type loginModel struct {
-	Login string `json:"login"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
@@ -110,7 +107,10 @@ func login(writer http.ResponseWriter, request *http.Request) {
 	token := "some_token"
 
 	writer.Header().Set("Content-Type", "application/jwt")
-	writer.Write([]byte(token))
+	if _, err := writer.Write([]byte(token)); err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	writer.WriteHeader(http.StatusOK)
 }
 
