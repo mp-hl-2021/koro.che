@@ -12,7 +12,7 @@ func main() {
 	router := mux.NewRouter()
 
 	//7
-	router.HandleFunc("/api/manage/link", deleteLink).Methods(http.MethodDelete)
+	router.HandleFunc("/api/manage/{link}", deleteLink).Methods(http.MethodDelete)
 	//8
 	router.HandleFunc("/api/manage/links", getUserLinks).Methods(http.MethodGet)
 	//9
