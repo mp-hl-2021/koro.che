@@ -11,6 +11,8 @@ import (
 func main() {
 	router := mux.NewRouter()
 
+	//7
+	router.HandleFunc("/api/manage/link", deleteLink).Methods(http.MethodDelete)
 	//8
 	router.HandleFunc("/api/manage/links", getUserLinks).Methods(http.MethodGet)
 	//9
@@ -27,6 +29,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func deleteLink(w http.ResponseWriter, r *http.Request) {
+	//some delete logic
 }
 
 func getUserLinks(w http.ResponseWriter, r *http.Request) {
