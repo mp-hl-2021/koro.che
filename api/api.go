@@ -1,11 +1,13 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
 	"koro.che/usecases"
 	"net/http"
+	"time"
 )
 
 type Api struct {
@@ -25,15 +27,38 @@ func (a *Api) Router() http.Handler {
 
 	router.HandleFunc("/api/register", a.register).Methods(http.MethodPost)
 	router.HandleFunc("/api/login", a.login).Methods(http.MethodPut)
-	router.HandleFunc("/api/logout", a.logout).Methods(http.MethodPut)
+	router.HandleFunc("/api/logout", a.authorize(a.logout)).Methods(http.MethodPut)
 	router.HandleFunc("/api/shorten", a.shortenLink).Methods(http.MethodPost)
 	router.HandleFunc("/api/{shorten_link}/real", a.getRealLink).Methods(http.MethodGet)
 	router.HandleFunc("/{shorten_link}", a.redirectToRealLink).Methods(http.MethodGet)
-	router.HandleFunc("/api/manage/{link}", a.deleteLink).Methods(http.MethodDelete)
-	router.HandleFunc("/api/manage/links", a.getUserLinks).Methods(http.MethodGet)
-	router.HandleFunc("/api/manage/stats", a.getUserLinkStats).Methods(http.MethodGet)
+	router.HandleFunc("/api/manage/{link}", a.authorize(a.deleteLink)).Methods(http.MethodDelete)
+	router.HandleFunc("/api/manage/links", a.authorize(a.getUserLinks)).Methods(http.MethodGet)
+	router.HandleFunc("/api/manage/stats", a.authorize(a.getUserLinkStats)).Methods(http.MethodGet)
 
 	return router
+}
+
+func (a *Api) authorize(handlerFunc http.HandlerFunc) http.HandlerFunc {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		cookie, err := request.Cookie("token")
+		if err != nil {
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if cookie.Expires.Unix() < time.Now().Unix() {
+			writer.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		token := cookie.Value
+		id, err := a.AccountUseCases.Authenticate(token)
+		if err != nil {
+			writer.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(request.Context(), "account_id", id)
+		handlerFunc(writer, request.WithContext(ctx))
+	}
 }
 
 type registrationModel struct {
