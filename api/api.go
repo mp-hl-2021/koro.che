@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
 	"koro.che/usecases"
 	"net/http"
@@ -47,6 +48,15 @@ func (a *Api) register(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	acc, err := a.AccountUseCases.CreateAccount(m.Login, m.Password)
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	location := fmt.Sprintf("/accounts/%s", acc.Id)
+	writer.Header().Set("Location", location)
 	writer.WriteHeader(http.StatusCreated)
 }
 
@@ -62,7 +72,10 @@ func (a *Api) login(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	token := "some_token"
+	token, err := a.AccountUseCases.LoginToAccount(m.Login, m.Password)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+	}
 
 	writer.Header().Set("Content-Type", "application/jwt")
 	if _, err := writer.Write([]byte(token)); err != nil {
@@ -73,9 +86,14 @@ func (a *Api) login(writer http.ResponseWriter, request *http.Request) {
 }
 
 func (a *Api) logout(writer http.ResponseWriter, request *http.Request) {
-	_, err := request.Cookie("_cookie")
-	if err != http.ErrNoCookie {
-		print(err, "Failed to get cookie")
+	c := http.Cookie{
+		Name:   "token",
+		MaxAge: -1}
+	http.SetCookie(writer, &c)
+
+	if _, err := writer.Write([]byte("Old cookie deleted. Logged out!\n")); err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	http.Redirect(writer, request, "/", http.StatusFound)
 }
