@@ -101,34 +101,34 @@ func (a* AccountUseCases) Logout() () {
 }
 
 func validateLogin(login string) error {
-	chars := 0
+	loginLength := 0
 	for _, r := range login {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
 			return ErrInvalidLoginString
 		}
-		chars++
+		loginLength++
 	}
-	if chars < minLoginLength {
+	if loginLength < minLoginLength {
 		return ErrTooShortLogin
 	}
-	if chars > maxLoginLength {
+	if loginLength > maxLoginLength {
 		return ErrTooLongLogin
 	}
 	return nil
 }
 
 func validatePassword(password string) error {
-	chars := 0
+	passwordLength := 0
 	for _, r := range password {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !unicode.IsSpace(r) {
 			return ErrInvalidPasswordString
 		}
-		chars++
+		passwordLength++
 	}
-	if chars < minPasswordLength {
+	if passwordLength < minPasswordLength {
 		return ErrTooShortPassword
 	}
-	if chars > maxPasswordLength {
+	if passwordLength > maxPasswordLength {
 		return ErrTooLongPassword
 	}
 	return nil

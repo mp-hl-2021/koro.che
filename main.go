@@ -19,7 +19,7 @@ func main() {
 
 	privateKeyBytes, err := ioutil.ReadFile(*privateKeyPath)
 	publicKeyBytes, err := ioutil.ReadFile(*publicKeyPath)
-	a, err := auth.NewJwt(privateKeyBytes, publicKeyBytes, 100*time.Minute)
+	a, err := auth.NewToken(privateKeyBytes, publicKeyBytes, 100*time.Minute)
 	if err != nil {
 		panic(err)
 	}
