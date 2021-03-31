@@ -12,14 +12,16 @@ import (
 var (
 	ErrInvalidLoginString    = errors.New("login string contains invalid character")
 	ErrInvalidPasswordString = errors.New("password string contains invalid character")
-	ErrTooShortString        = errors.New("too short string")
-	ErrTooLongString         = errors.New("too long string")
+	ErrTooShortLogin       = errors.New("too short login")
+	ErrTooLongLogin        = errors.New("too long login")
+	ErrTooShortPassword       = errors.New("too short password")
+	ErrTooLongPassword         = errors.New("too long password")
 )
 
 const (
 	minLoginLength    = 6
 	maxLoginLength    = 20
-	minPasswordLength = 14
+	minPasswordLength = 8
 	maxPasswordLength = 48
 )
 
@@ -107,10 +109,10 @@ func validateLogin(login string) error {
 		chars++
 	}
 	if chars < minLoginLength {
-		return ErrTooShortString
+		return ErrTooShortLogin
 	}
 	if chars > maxLoginLength {
-		return ErrTooLongString
+		return ErrTooLongLogin
 	}
 	return nil
 }
@@ -124,10 +126,10 @@ func validatePassword(password string) error {
 		chars++
 	}
 	if chars < minPasswordLength {
-		return ErrTooShortString
+		return ErrTooShortPassword
 	}
 	if chars > maxPasswordLength {
-		return ErrTooLongString
+		return ErrTooLongPassword
 	}
 	return nil
 }

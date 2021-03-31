@@ -77,6 +77,7 @@ func (a *Api) register(writer http.ResponseWriter, request *http.Request) {
 	acc, err := a.AccountUseCases.CreateAccount(m.Login, m.Password)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
+		writer.Write([]byte(err.Error()))
 		return
 	}
 
