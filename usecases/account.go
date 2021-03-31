@@ -14,9 +14,6 @@ var (
 	ErrInvalidPasswordString = errors.New("password string contains invalid character")
 	ErrTooShortString        = errors.New("too short string")
 	ErrTooLongString         = errors.New("too long string")
-
-	ErrInvalidLogin    = errors.New("login not found")
-	ErrInvalidPassword = errors.New("invalid password")
 )
 
 const (
