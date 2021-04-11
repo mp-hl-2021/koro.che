@@ -1,11 +1,16 @@
 package usecases
 
+import (
+	"koro.che/linkstorage"
+)
+
 type LinkUseCasesInterface interface {
 	ShortenLink(link string) (string, error)
+	MakeRedirect(key string) (string, error)
 	DeleteLink(link string) ()
-	GetRealLink(shortLink string) (string, error)
+	GetRealLink(key string) (string, error)
 	GetUserLinks(userId string) ([]string, error)
-	GetLinkStats(link string) ([]LinkStat, error)
+	GetLinkStats(key string) ([]LinkStat, error)
 }
 
 type LinkStat struct {
@@ -13,24 +18,42 @@ type LinkStat struct {
 	UseCounter int64  `json:"useCounter"`
 }
 
-type LinkUseCases struct{}
+type LinkUseCases struct{
+	LinkStorage linkstorage.Interface
+}
 
-func (LinkUseCases) ShortenLink(link string) (string, error) {
+// const prefix = "koro.che/"
+const prefix =  "localhost:8080/"
+
+func (l* LinkUseCases) ShortenLink(link string) (string, error) {
+	var shortLink string
+	var err error
+	shortLink, err = l.LinkStorage.CreateShortLink(link)
+	return prefix + shortLink, err
+}
+
+func (l* LinkUseCases) MakeRedirect(key string) (string, error)  {
+	var link string
+	var err error
+	link, err = l.LinkStorage.MakeRedirect(key)
+	return link, err
+}
+
+func (l* LinkUseCases) DeleteLink(link string) () {
 	panic("not implemented method")
 }
 
-func (LinkUseCases) DeleteLink(link string) () {
+func (l* LinkUseCases) GetRealLink(key string) (string, error) {
+	var link string
+	var err error
+	link, err = l.LinkStorage.GetLinkByKey(key)
+	return link, err
+}
+
+func (l* LinkUseCases) GetUserLinks(userId string) ([]string, error) {
 	panic("not implemented method")
 }
 
-func (LinkUseCases) GetRealLink(shortLink string) (string, error) {
-	panic("not implemented method")
-}
-
-func (LinkUseCases) GetUserLinks(userId string) ([]string, error) {
-	panic("not implemented method")
-}
-
-func (LinkUseCases) GetLinkStats(link string) ([]LinkStat, error) {
+func (l* LinkUseCases) GetLinkStats(link string) ([]LinkStat, error) {
 	panic("not implemented method")
 }

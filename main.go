@@ -6,6 +6,7 @@ import (
 	"koro.che/accountstorage"
 	"koro.che/api"
 	"koro.che/auth"
+	"koro.che/linkstorage"
 	"koro.che/usecases"
 	"net/http"
 	"time"
@@ -27,7 +28,10 @@ func main() {
 		AccountStorage: accountstorage.NewMemory(),
 		Auth:           a,
 	}
-	service := api.NewApi(&accountUseCases, &usecases.LinkUseCases{})
+	linkUseCases := usecases.LinkUseCases{
+		LinkStorage: linkstorage.NewMemory(),
+	}
+	service := api.NewApi(&accountUseCases, &linkUseCases)
 
 	server := http.Server{
 		Addr:         "localhost:8080",

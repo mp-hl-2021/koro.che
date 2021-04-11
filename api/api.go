@@ -29,9 +29,9 @@ func (a *Api) Router() http.Handler {
 	router.HandleFunc("/api/login", a.login).Methods(http.MethodPut)
 	router.HandleFunc("/api/logout", a.authorize(a.logout)).Methods(http.MethodPut)
 	router.HandleFunc("/api/shorten", a.shortenLink).Methods(http.MethodPost)
-	router.HandleFunc("/api/{shorten_link}/real", a.getRealLink).Methods(http.MethodGet)
-	router.HandleFunc("/{shorten_link}", a.redirectToRealLink).Methods(http.MethodGet)
-	router.HandleFunc("/api/manage/{link}", a.authorize(a.deleteLink)).Methods(http.MethodDelete)
+	router.HandleFunc("/api/{key}/real", a.getRealLink).Methods(http.MethodGet)
+	router.HandleFunc("/{key}", a.redirectToRealLink).Methods(http.MethodGet)
+	router.HandleFunc("/api/manage/{key}", a.authorize(a.deleteLink)).Methods(http.MethodDelete)
 	router.HandleFunc("/api/manage/links", a.authorize(a.getUserLinks)).Methods(http.MethodGet)
 	router.HandleFunc("/api/manage/stats", a.authorize(a.getUserLinkStats)).Methods(http.MethodGet)
 
@@ -126,8 +126,8 @@ func (a *Api) logout(writer http.ResponseWriter, request *http.Request) {
 
 func (a *Api) redirectToRealLink(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
-	if vars["shorten_link"] == "kek" {
-		http.Redirect(writer, request, "https://tsarn.website/sp", http.StatusMovedPermanently)
+	if link, err := a.LinkUseCases.MakeRedirect(vars["key"]); err == nil {
+		http.Redirect(writer, request, "https://" + link, http.StatusMovedPermanently)
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
 	}
@@ -140,8 +140,8 @@ type linkModel struct {
 func (a *Api) getRealLink(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	vars := mux.Vars(request)
-	if vars["shorten_link"] == "kek" {
-		o := linkModel{Link: "https://tsarn.website/sp"}
+	if link, err := a.LinkUseCases.GetRealLink(vars["key"]); err == nil {
+		o := linkModel{Link: link}
 		if err := json.NewEncoder(writer).Encode(o); err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
@@ -159,7 +159,8 @@ func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	o := linkModel{Link: "https://koro.che/kek"}
+	var shortLink, _ = a.LinkUseCases.ShortenLink(m.Link)
+	o := linkModel{Link: shortLink}
 	if err := json.NewEncoder(writer).Encode(o); err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
