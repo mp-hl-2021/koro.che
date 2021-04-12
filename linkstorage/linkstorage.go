@@ -3,7 +3,7 @@ package linkstorage
 import "errors"
 
 var (
-	ErrNotExist = errors.New("lin does not exist")
+	ErrNotExist = errors.New("link does not exist")
 )
 
 type Interface interface {

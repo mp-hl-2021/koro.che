@@ -7,7 +7,7 @@ import (
 
 type Memory struct {
 	linkByKey  map[string]string
-	StatsNyKey map[string]uint64
+	StatsByKey map[string]uint64
 	userToLinksKeys map[string]map[string]bool
 	mu         *sync.Mutex
 }
@@ -15,7 +15,7 @@ type Memory struct {
 func NewMemory() *Memory {
 	return &Memory{
 		linkByKey:  make(map[string]string),
-		StatsNyKey: make(map[string]uint64),
+		StatsByKey: make(map[string]uint64),
 		userToLinksKeys: make(map[string]map[string]bool),
 		mu:         &sync.Mutex{},
 	}
@@ -40,7 +40,7 @@ func (m *Memory) CreateShortLink(link string, userId string) (string, error) {
 		shortLink = RandString()
 		if m.linkByKey[shortLink] == "" {
 			m.linkByKey[shortLink] = link
-			m.StatsNyKey[shortLink] = 0
+			m.StatsByKey[shortLink] = 0
 			break
 		}
 	}
@@ -73,7 +73,7 @@ func (m *Memory) MakeRedirect(key string) (string, error) {
 	if err!= nil {
 		return "", err
 	}
-	m.StatsNyKey[key] += 1
+	m.StatsByKey[key] += 1
 	return link, err
 }
 
@@ -89,7 +89,7 @@ func (m *Memory) DeleteLink(key string, userId string) (string, error) {
 		return "", err
 	}
 	delete(m.linkByKey, key)
-	delete(m.StatsNyKey, key)
+	delete(m.StatsByKey, key)
 	if userId != "" {
 		delete(m.userToLinksKeys[userId], link)
 	}
@@ -113,7 +113,7 @@ func (m *Memory) GetUserLinks(userId string) ([]string, error) {
 func (m *Memory) GetLinkStat(link string) (uint64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	var useCounter, ok = m.StatsNyKey[link]
+	var useCounter, ok = m.StatsByKey[link]
 	if !ok {
 		return 0, ErrNotExist
 	}

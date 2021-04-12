@@ -153,6 +153,21 @@ func (a *Api) getRealLink(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
+func GetUserId(a *Api, r *http.Request) string {
+	cookie, err := r.Cookie("token")
+	if err != nil {
+		return ""
+	}
+	if cookie.Expires.Unix() < time.Now().Unix() && cookie.Expires.Unix() >= 0 {
+		return ""
+	}
+	token := cookie.Value
+	id, err := a.AccountUseCases.Authenticate(token)
+	if err != nil {
+		return ""
+	}
+	return id
+}
 
 func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -163,22 +178,7 @@ func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	// get user id if exists
-	userId := func () string {
-		cookie, err := request.Cookie("token")
-		if err != nil {
-			return ""
-		}
-		if cookie.Expires.Unix() < time.Now().Unix() && cookie.Expires.Unix() >= 0 {
-			return ""
-		}
-		token := cookie.Value
-		id, err := a.AccountUseCases.Authenticate(token)
-		if err != nil {
-			return ""
-		}
-		return id
-	}()
-	print(userId, "loool")
+	userId := GetUserId(a, request)
 
 	var shortLink, _ = a.LinkUseCases.ShortenLink(m.Link, userId)
 	o := linkModel{Link: shortLink}
@@ -197,21 +197,7 @@ func (a *Api) deleteLink(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	// get user id if exists
-	userId := func () string {
-		cookie, err := request.Cookie("token")
-		if err != nil {
-			return ""
-		}
-		if cookie.Expires.Unix() < time.Now().Unix() && cookie.Expires.Unix() >= 0 {
-			return ""
-		}
-		token := cookie.Value
-		id, err := a.AccountUseCases.Authenticate(token)
-		if err != nil {
-			return ""
-		}
-		return id
-	}()
+	userId := GetUserId(a, request)
 
 	if _, err := a.LinkUseCases.DeleteLink(m.Link, userId); err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
@@ -224,7 +210,6 @@ func (a *Api) deleteLink(writer http.ResponseWriter, request *http.Request) {
 func (a *Api) getUserLinks(w http.ResponseWriter, r *http.Request) {
 	var links []string
 	userId := r.Context().Value("account_id").(string)
-	print(userId)
 	links, err := a.LinkUseCases.GetUserLinks(userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
