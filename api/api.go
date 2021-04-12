@@ -152,6 +152,7 @@ func (a *Api) getRealLink(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
+
 func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	var m linkModel
@@ -159,7 +160,25 @@ func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	var shortLink, _ = a.LinkUseCases.ShortenLink(m.Link)
+
+	// get user id if exists
+	userId := func () string {
+		cookie, err := request.Cookie("token")
+		if err != nil {
+			return ""
+		}
+		if cookie.Expires.Unix() < time.Now().Unix() {
+			return ""
+		}
+		token := cookie.Value
+		id, err := a.AccountUseCases.Authenticate(token)
+		if err != nil {
+			return ""
+		}
+		return id
+	}()
+
+	var shortLink, _ = a.LinkUseCases.ShortenLink(m.Link, userId)
 	o := linkModel{Link: shortLink}
 	if err := json.NewEncoder(writer).Encode(o); err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -174,30 +193,56 @@ func (a *Api) deleteLink(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	// get user id if exists
+	userId := func () string {
+		cookie, err := request.Cookie("token")
+		if err != nil {
+			return ""
+		}
+		if cookie.Expires.Unix() < time.Now().Unix() {
+			return ""
+		}
+		token := cookie.Value
+		id, err := a.AccountUseCases.Authenticate(token)
+		if err != nil {
+			return ""
+		}
+		return id
+	}()
+
+	if _, err := a.LinkUseCases.DeleteLink(m.Link, userId); err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	writer.WriteHeader(http.StatusOK)
 }
 
 func (a *Api) getUserLinks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	o := struct {
-		Links []string `json:"links"`
-	}{
-		Links: []string{"dota2", "lol_kek"},
+	var links []string
+	userId := r.Context().Value("account_id").(string)
+	links, err := a.LinkUseCases.GetUserLinks(userId)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-	if err := json.NewEncoder(w).Encode(o); err != nil {
+	if err := json.NewEncoder(w).Encode(links); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
 func (a *Api) getUserLinkStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	var dotaStat = usecases.LinkStat{LinkName: "dota2", UseCounter: 228}
-	var lolKekStat = usecases.LinkStat{LinkName: "lol_kek", UseCounter: 1337}
-	o := struct {
-		Stats []usecases.LinkStat `json:"linkStats"`
-	}{
-		Stats: []usecases.LinkStat{dotaStat, lolKekStat},
+	var m linkModel
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	o, err := a.LinkUseCases.GetLinkStats(m.Link)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	if err := json.NewEncoder(w).Encode(o); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
