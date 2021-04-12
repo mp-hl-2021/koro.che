@@ -119,3 +119,10 @@ func (m *Memory) GetLinkStat(link string) (uint64, error) {
 	}
 	return useCounter, nil
 }
+
+func (m *Memory) CreateUserLinksStorage(userId string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.userToLinksKeys[userId] = map[string]bool{}
+	return "", nil
+}

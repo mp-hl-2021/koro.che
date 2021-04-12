@@ -13,4 +13,5 @@ type Interface interface {
 	DeleteLink(key string, userId string) (string, error)
 	GetUserLinks(userId string) ([]string, error)
 	GetLinkStat(link string) (uint64, error)
+	CreateUserLinksStorage(userId string) (string, error)
 }

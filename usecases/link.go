@@ -11,6 +11,7 @@ type LinkUseCasesInterface interface {
 	GetRealLink(key string) (string, error)
 	GetUserLinks(userId string) ([]string, error)
 	GetLinkStats(key string) (LinkStat, error)
+	CreateUserLinksStorage(userId string) (string, error)
 }
 
 type LinkStat struct {
@@ -63,4 +64,11 @@ func (l* LinkUseCases) GetLinkStats(link string) (LinkStat, error) {
 	var err error
 	stat, err = l.LinkStorage.GetLinkStat(link)
 	return LinkStat{link, stat}, err
+}
+
+func (l* LinkUseCases) CreateUserLinksStorage(userId string) (string, error) {
+	var s string
+	var err error
+	s, err = l.LinkStorage.CreateUserLinksStorage(userId)
+	return s, err
 }

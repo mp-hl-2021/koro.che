@@ -45,7 +45,7 @@ func (a *Api) authorize(handlerFunc http.HandlerFunc) http.HandlerFunc {
 			writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if cookie.Expires.Unix() < time.Now().Unix() {
+		if cookie.Expires.Unix() < time.Now().Unix() && cookie.Expires.Unix() >= 0 {
 			writer.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -80,6 +80,7 @@ func (a *Api) register(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(err.Error()))
 		return
 	}
+	a.LinkUseCases.CreateUserLinksStorage(acc.Id)
 
 	location := fmt.Sprintf("/accounts/%s", acc.Id)
 	writer.Header().Set("Location", location)
@@ -167,7 +168,7 @@ func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 		if err != nil {
 			return ""
 		}
-		if cookie.Expires.Unix() < time.Now().Unix() {
+		if cookie.Expires.Unix() < time.Now().Unix() && cookie.Expires.Unix() >= 0 {
 			return ""
 		}
 		token := cookie.Value
@@ -177,6 +178,7 @@ func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 		}
 		return id
 	}()
+	print(userId, "loool")
 
 	var shortLink, _ = a.LinkUseCases.ShortenLink(m.Link, userId)
 	o := linkModel{Link: shortLink}
@@ -200,7 +202,7 @@ func (a *Api) deleteLink(writer http.ResponseWriter, request *http.Request) {
 		if err != nil {
 			return ""
 		}
-		if cookie.Expires.Unix() < time.Now().Unix() {
+		if cookie.Expires.Unix() < time.Now().Unix() && cookie.Expires.Unix() >= 0 {
 			return ""
 		}
 		token := cookie.Value
@@ -222,6 +224,7 @@ func (a *Api) deleteLink(writer http.ResponseWriter, request *http.Request) {
 func (a *Api) getUserLinks(w http.ResponseWriter, r *http.Request) {
 	var links []string
 	userId := r.Context().Value("account_id").(string)
+	print(userId)
 	links, err := a.LinkUseCases.GetUserLinks(userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
