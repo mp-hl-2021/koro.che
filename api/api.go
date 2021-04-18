@@ -29,9 +29,9 @@ func (a *Api) Router() http.Handler {
 	router.HandleFunc("/api/login", a.login).Methods(http.MethodPut)
 	router.HandleFunc("/api/logout", a.authorize(a.logout)).Methods(http.MethodPut)
 	router.HandleFunc("/api/shorten", a.shortenLink).Methods(http.MethodPost)
-	router.HandleFunc("/api/{shorten_link}/real", a.getRealLink).Methods(http.MethodGet)
-	router.HandleFunc("/{shorten_link}", a.redirectToRealLink).Methods(http.MethodGet)
-	router.HandleFunc("/api/manage/{link}", a.authorize(a.deleteLink)).Methods(http.MethodDelete)
+	router.HandleFunc("/api/{key}/real", a.getRealLink).Methods(http.MethodGet)
+	router.HandleFunc("/{key}", a.redirectToRealLink).Methods(http.MethodGet)
+	router.HandleFunc("/api/manage/{key}", a.authorize(a.deleteLink)).Methods(http.MethodDelete)
 	router.HandleFunc("/api/manage/links", a.authorize(a.getUserLinks)).Methods(http.MethodGet)
 	router.HandleFunc("/api/manage/stats", a.authorize(a.getUserLinkStats)).Methods(http.MethodGet)
 
@@ -45,7 +45,7 @@ func (a *Api) authorize(handlerFunc http.HandlerFunc) http.HandlerFunc {
 			writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		if cookie.Expires.Unix() < time.Now().Unix() {
+		if cookie.Expires.Unix() < time.Now().Unix() && cookie.Expires.Unix() >= 0 {
 			writer.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -80,6 +80,7 @@ func (a *Api) register(writer http.ResponseWriter, request *http.Request) {
 		writer.Write([]byte(err.Error()))
 		return
 	}
+	a.LinkUseCases.CreateUserLinksStorage(acc.Id)
 
 	location := fmt.Sprintf("/accounts/%s", acc.Id)
 	writer.Header().Set("Location", location)
@@ -126,8 +127,8 @@ func (a *Api) logout(writer http.ResponseWriter, request *http.Request) {
 
 func (a *Api) redirectToRealLink(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
-	if vars["shorten_link"] == "kek" {
-		http.Redirect(writer, request, "https://tsarn.website/sp", http.StatusMovedPermanently)
+	if link, err := a.LinkUseCases.MakeRedirect(vars["key"]); err == nil {
+		http.Redirect(writer, request, "https://" + link, http.StatusMovedPermanently)
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
 	}
@@ -140,8 +141,8 @@ type linkModel struct {
 func (a *Api) getRealLink(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	vars := mux.Vars(request)
-	if vars["shorten_link"] == "kek" {
-		o := linkModel{Link: "https://tsarn.website/sp"}
+	if link, err := a.LinkUseCases.GetRealLink(vars["key"]); err == nil {
+		o := linkModel{Link: link}
 		if err := json.NewEncoder(writer).Encode(o); err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
@@ -152,6 +153,22 @@ func (a *Api) getRealLink(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
+func GetUserId(a *Api, r *http.Request) string {
+	cookie, err := r.Cookie("token")
+	if err != nil {
+		return ""
+	}
+	if cookie.Expires.Unix() < time.Now().Unix() && cookie.Expires.Unix() >= 0 {
+		return ""
+	}
+	token := cookie.Value
+	id, err := a.AccountUseCases.Authenticate(token)
+	if err != nil {
+		return ""
+	}
+	return id
+}
+
 func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	var m linkModel
@@ -159,7 +176,12 @@ func (a *Api) shortenLink(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	o := linkModel{Link: "https://koro.che/kek"}
+
+	// get user id if exists
+	userId := GetUserId(a, request)
+
+	var shortLink, _ = a.LinkUseCases.ShortenLink(m.Link, userId)
+	o := linkModel{Link: shortLink}
 	if err := json.NewEncoder(writer).Encode(o); err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		return
@@ -173,30 +195,42 @@ func (a *Api) deleteLink(writer http.ResponseWriter, request *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	// get user id if exists
+	userId := GetUserId(a, request)
+
+	if _, err := a.LinkUseCases.DeleteLink(m.Link, userId); err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	writer.WriteHeader(http.StatusOK)
 }
 
 func (a *Api) getUserLinks(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	o := struct {
-		Links []string `json:"links"`
-	}{
-		Links: []string{"dota2", "lol_kek"},
+	var links []string
+	userId := r.Context().Value("account_id").(string)
+	links, err := a.LinkUseCases.GetUserLinks(userId)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-	if err := json.NewEncoder(w).Encode(o); err != nil {
+	if err := json.NewEncoder(w).Encode(links); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
 
 func (a *Api) getUserLinkStats(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	var dotaStat = usecases.LinkStat{LinkName: "dota2", UseCounter: 228}
-	var lolKekStat = usecases.LinkStat{LinkName: "lol_kek", UseCounter: 1337}
-	o := struct {
-		Stats []usecases.LinkStat `json:"linkStats"`
-	}{
-		Stats: []usecases.LinkStat{dotaStat, lolKekStat},
+	var m linkModel
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	o, err := a.LinkUseCases.GetLinkStats(m.Link)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
 	}
 	if err := json.NewEncoder(w).Encode(o); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

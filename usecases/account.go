@@ -34,7 +34,6 @@ type AccountUseCasesInterface interface {
 	GetAccountById(id string) (Account, error)
 	LoginToAccount(login, password string) (string, error)
 	Authenticate(token string) (string, error)
-	Logout() ()
 }
 
 type AccountUseCases struct {
@@ -94,10 +93,6 @@ func (a* AccountUseCases) LoginToAccount(login string, password string) (string,
 
 func (a* AccountUseCases) Authenticate(token string) (string, error) {
 	return a.Auth.UserIdByToken(token)
-}
-
-func (a* AccountUseCases) Logout() () {
-	panic("not implemented method")
 }
 
 func validateLogin(login string) error {
