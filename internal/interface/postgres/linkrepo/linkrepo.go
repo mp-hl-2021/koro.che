@@ -71,16 +71,8 @@ func (p *Postgres) CreateShortLink(link string, userId string) (string, error) {
 		row := p.conn.QueryRow(queryGetRealLinkByKey, key)
 		err := row.Scan()
 		if err == sql.ErrNoRows {
-			row := p.conn.QueryRow(queryCreateLink, userId, link, key)
-			err := row.Scan()
-			println(err)
-			/*
-			if err != nil {
-				// todo need wrapping???
-				return "", err
-			}
-
-			 */
+			p.conn.QueryRow(queryCreateLink, userId, link, key)
+		    // todo need wrapping???
 			break
 		}
 	}
@@ -127,15 +119,24 @@ func (p *Postgres) DeleteLink(key string, userId string) (string, error) {
 }
 
 func (p *Postgres) GetUserLinks(userId string) ([]string, error) {
-	var userLinks []string
-	row:= p.conn.QueryRow(queryUserLinks, userId)
-	err:= row.Scan(&userLinks) //todo warpping
-	return userLinks, err
+	var userLinks = make([]string, 0)
+	rows, err := p.conn.Query(queryUserLinks, userId)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var link string
+		if err := rows.Scan(&link); err != nil {
+			return nil, err
+		}
+		userLinks = append(userLinks, link)
+	}
+	return userLinks, nil
 }
 
 func (p *Postgres) GetLinkStat(key string) (uint64, error) {
 	var stat uint64
-	row:=p.conn.QueryRow(queryLinkStats, key)
+	row := p.conn.QueryRow(queryLinkStats, key)
 	err := row.Scan(&stat) //todo wrapping
 	return stat, err
 }
