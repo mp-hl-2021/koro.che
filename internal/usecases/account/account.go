@@ -1,11 +1,11 @@
-package usecases
+package account
 
 import (
 	"golang.org/x/crypto/bcrypt"
-	"koro.che/auth"
+	auth2 "koro.che/internal/auth"
+	"koro.che/internal/domain/account"
 
 	"errors"
-	"koro.che/accountstorage"
 	"unicode"
 )
 
@@ -37,11 +37,11 @@ type AccountUseCasesInterface interface {
 }
 
 type AccountUseCases struct {
-	AccountStorage accountstorage.Interface
-	Auth           auth.Interface
+	AccountStorage account.Interface
+	Auth           auth2.Interface
 }
 
-func (a* AccountUseCases) CreateAccount(login string, password string) (Account, error) {
+func (a*AccountUseCases) CreateAccount(login string, password string) (Account, error) {
 	if err := validateLogin(login); err != nil {
 		return Account{}, err
 	}
@@ -52,7 +52,7 @@ func (a* AccountUseCases) CreateAccount(login string, password string) (Account,
 	if err != nil {
 		return Account{}, err
 	}
-	acc, err := a.AccountStorage.CreateAccount(accountstorage.Credentials{
+	acc, err := a.AccountStorage.CreateAccount(account.Credentials{
 		Login:    login,
 		Password: string(hashedPassword),
 	})
@@ -62,7 +62,7 @@ func (a* AccountUseCases) CreateAccount(login string, password string) (Account,
 	return Account{Id: acc.Id}, nil
 }
 
-func (a* AccountUseCases) GetAccountById(id string) (Account, error) {
+func (a*AccountUseCases) GetAccountById(id string) (Account, error) {
 	acc, err := a.AccountStorage.GetAccountById(id)
 	if err != nil {
 		return Account{}, err
@@ -70,7 +70,7 @@ func (a* AccountUseCases) GetAccountById(id string) (Account, error) {
 	return Account{Id: acc.Id}, err
 }
 
-func (a* AccountUseCases) LoginToAccount(login string, password string) (string, error) {
+func (a*AccountUseCases) LoginToAccount(login string, password string) (string, error) {
 	if err := validateLogin(login); err != nil {
 		return "", err
 	}
@@ -91,7 +91,7 @@ func (a* AccountUseCases) LoginToAccount(login string, password string) (string,
 	return token, err
 }
 
-func (a* AccountUseCases) Authenticate(token string) (string, error) {
+func (a*AccountUseCases) Authenticate(token string) (string, error) {
 	return a.Auth.UserIdByToken(token)
 }
 

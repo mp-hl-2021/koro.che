@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"io/ioutil"
-	"koro.che/accountstorage"
-	"koro.che/api"
-	"koro.che/auth"
-	"koro.che/linkstorage"
-	"koro.che/usecases"
+	auth2 "koro.che/internal/auth"
+	"koro.che/internal/interface/httpapi"
+	"koro.che/internal/interface/memory/accountrepo"
+	"koro.che/internal/interface/memory/linkrepo"
+	"koro.che/internal/usecases/account"
+	"koro.che/internal/usecases/link"
 	"net/http"
 	"time"
 )
@@ -20,21 +21,21 @@ func main() {
 
 	privateKeyBytes, err := ioutil.ReadFile(*privateKeyPath)
 	publicKeyBytes, err := ioutil.ReadFile(*publicKeyPath)
-	a, err := auth.NewToken(privateKeyBytes, publicKeyBytes, 100*time.Minute)
+	a, err := auth2.NewToken(privateKeyBytes, publicKeyBytes, 100*time.Minute)
 	if err != nil {
 		panic(err)
 	}
-	accountUseCases := usecases.AccountUseCases{
-		AccountStorage: accountstorage.NewMemory(),
+	accountUseCases := account.AccountUseCases{
+		AccountStorage: accountrepo.NewMemory(),
 		Auth:           a,
 	}
-	linkUseCases := usecases.LinkUseCases{
-		LinkStorage: linkstorage.NewMemory(),
+	linkUseCases := link.LinkUseCases{
+		LinkStorage: linkrepo.NewMemory(),
 	}
-	service := api.NewApi(&accountUseCases, &linkUseCases)
+	service := httpapi.NewApi(&accountUseCases, &linkUseCases)
 
 	server := http.Server{
-		Addr:         ":8080",
+		Addr:         "localhost:8080",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		Handler:      service.Router(),

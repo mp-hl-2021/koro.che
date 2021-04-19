@@ -1,4 +1,4 @@
-package linkstorage
+package link
 
 import "errors"
 

@@ -1,21 +1,22 @@
-package api
+package httpapi
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"koro.che/usecases"
+	"koro.che/internal/usecases/account"
+	"koro.che/internal/usecases/link"
 	"net/http"
 	"time"
 )
 
 type Api struct {
-	AccountUseCases usecases.AccountUseCasesInterface
-	LinkUseCases    usecases.LinkUseCasesInterface
+	AccountUseCases account.AccountUseCasesInterface
+	LinkUseCases    link.LinkUseCasesInterface
 }
 
-func NewApi(a usecases.AccountUseCasesInterface, l usecases.LinkUseCasesInterface) *Api {
+func NewApi(a account.AccountUseCasesInterface, l link.LinkUseCasesInterface) *Api {
 	return &Api{
 		AccountUseCases: a,
 		LinkUseCases:    l,
