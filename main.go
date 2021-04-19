@@ -1,16 +1,20 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	auth2 "koro.che/internal/auth"
 	"koro.che/internal/interface/httpapi"
-	"koro.che/internal/interface/memory/accountrepo"
+	"koro.che/internal/interface/postgres/accountrepo"
 	"koro.che/internal/interface/memory/linkrepo"
 	"koro.che/internal/usecases/account"
 	"koro.che/internal/usecases/link"
 	"net/http"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -25,8 +29,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	connStr := "user=postgres password=12345678 port=5432 host=localhost dbname=postgres sslmode=disable"
+
+	conn, err := sql.Open("postgres", connStr)
+	if err != nil {
+		panic(fmt.Sprintf("Couldn't connect to DB: %v", err))
+	}
+
 	accountUseCases := account.AccountUseCases{
-		AccountStorage: accountrepo.NewMemory(),
+		AccountStorage: accountrepo.New(conn),
 		Auth:           a,
 	}
 	linkUseCases := link.LinkUseCases{
@@ -35,7 +47,7 @@ func main() {
 	service := httpapi.NewApi(&accountUseCases, &linkUseCases)
 
 	server := http.Server{
-		Addr:         "localhost:8080",
+		Addr:         ":8080",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		Handler:      service.Router(),
