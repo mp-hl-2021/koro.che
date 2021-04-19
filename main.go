@@ -8,7 +8,7 @@ import (
 	auth2 "koro.che/internal/auth"
 	"koro.che/internal/interface/httpapi"
 	"koro.che/internal/interface/postgres/accountrepo"
-	"koro.che/internal/interface/memory/linkrepo"
+	"koro.che/internal/interface/postgres/linkrepo"
 	"koro.che/internal/usecases/account"
 	"koro.che/internal/usecases/link"
 	"net/http"
@@ -42,7 +42,7 @@ func main() {
 		Auth:           a,
 	}
 	linkUseCases := link.LinkUseCases{
-		LinkStorage: linkrepo.NewMemory(),
+		LinkStorage: linkrepo.New(conn),
 	}
 	service := httpapi.NewApi(&accountUseCases, &linkUseCases)
 

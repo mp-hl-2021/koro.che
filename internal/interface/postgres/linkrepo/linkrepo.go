@@ -73,10 +73,14 @@ func (p *Postgres) CreateShortLink(link string, userId string) (string, error) {
 		if err == sql.ErrNoRows {
 			row := p.conn.QueryRow(queryCreateLink, userId, link, key)
 			err := row.Scan()
+			println(err)
+			/*
 			if err != nil {
 				// todo need wrapping???
 				return "", err
 			}
+
+			 */
 			break
 		}
 	}
@@ -97,14 +101,12 @@ func (p *Postgres) MakeRedirect(key string) (string, error) {
 	var realLink string
 	row := p.conn.QueryRow(queryGetRealLinkByKey, key)
 	err := row.Scan(&realLink)
+
 	if err != nil && err == sql.ErrNoRows {
 		return "", link2.ErrNotExist
 	}
-	if err != nil {
-		return "", err // todo wrapping
-	}
+
 	row = p.conn.QueryRow(queryIncreaseLinkStat, key)
-	err = row.Scan() // todo wrapping?
 
 	return realLink, err
 }
