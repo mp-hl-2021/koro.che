@@ -122,7 +122,7 @@ func (p *Postgres) DeleteLink(key string, userId string) (string, error) {
 		return "", err // todo wrapping
 	}
 	row = p.conn.QueryRow(queryDeleteLink, key)
-	err = row.Scan() //todo wrap
+
 	return realLink, err
 }
 
