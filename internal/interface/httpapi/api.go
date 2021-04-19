@@ -104,7 +104,7 @@ func (a *Api) login(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 	}
-
+	http.SetCookie(writer, &http.Cookie{Name: "token", Value: token})
 	writer.Header().Set("Content-Type", "application/jwt")
 	if _, err := writer.Write([]byte(token)); err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -129,7 +129,7 @@ func (a *Api) logout(writer http.ResponseWriter, request *http.Request) {
 func (a *Api) redirectToRealLink(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	if link, err := a.LinkUseCases.MakeRedirect(vars["key"]); err == nil {
-		http.Redirect(writer, request, "https://" + link, http.StatusMovedPermanently)
+		http.Redirect(writer, request, "https://"+link, http.StatusMovedPermanently)
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
 	}

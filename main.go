@@ -7,8 +7,8 @@ import (
 	"io/ioutil"
 	auth2 "koro.che/internal/auth"
 	"koro.che/internal/interface/httpapi"
-	"koro.che/internal/interface/postgres/accountrepo"
 	"koro.che/internal/interface/memory/linkrepo"
+	"koro.che/internal/interface/postgres/accountrepo"
 	"koro.che/internal/usecases/account"
 	"koro.che/internal/usecases/link"
 	"net/http"
@@ -30,7 +30,7 @@ func main() {
 		panic(err)
 	}
 
-	connStr := "user=postgres password=12345678 port=5432 host=localhost dbname=postgres sslmode=disable"
+	connStr := "user=postgres password=12345678 port=5432 host=db dbname=postgres sslmode=disable"
 
 	conn, err := sql.Open("postgres", connStr)
 	if err != nil {
