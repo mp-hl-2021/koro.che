@@ -7,11 +7,11 @@ create table accounts
 
 create table links
 (
-    id           serial primary key,
-    creator_id   int default null,
-    realLink     varchar(255),
-    shorten_link varchar(255) unique,
-    use_counter  int default 0,
+    id          serial primary key,
+    creator_id  int default null,
+    real_link   varchar(255),
+    key         varchar(255) unique,
+    use_counter int default 0,
 
     constraint fk_creator
         foreign key (creator_id)
