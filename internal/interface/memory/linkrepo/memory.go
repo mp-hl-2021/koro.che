@@ -1,6 +1,7 @@
-package linkstorage
+package linkrepo
 
 import (
+	link2 "koro.che/internal/domain/link"
 	"math/rand"
 	"sync"
 )
@@ -56,7 +57,7 @@ func (m *Memory) GetLinkByKey(key string) (string, error) {
 	var link = m.linkByKey[key]
 	var err error = nil
 	if link == "" {
-		err = ErrNotExist
+		err = link2.ErrNotExist
 	}
 	return link, err
 }
@@ -68,7 +69,7 @@ func (m *Memory) MakeRedirect(key string) (string, error) {
 	var err error = nil
 	//todo refactor mb use GetLinkByKey
 	if link == "" {
-		err = ErrNotExist
+		err = link2.ErrNotExist
 	}
 	if err!= nil {
 		return "", err
@@ -83,7 +84,7 @@ func (m *Memory) DeleteLink(key string, userId string) (string, error) {
 	var link = m.linkByKey[key]
 	var err error = nil
 	if link == "" {
-		err = ErrNotExist
+		err = link2.ErrNotExist
 	}
 	if err != nil {
 		return "", err
@@ -101,7 +102,7 @@ func (m *Memory) GetUserLinks(userId string) ([]string, error) {
 	defer m.mu.Unlock()
 	var links, ok = m.userToLinksKeys[userId]
 	if !ok {
-		return []string{}, ErrNotExist
+		return []string{}, link2.ErrNotExist
 	}
 	keys := make([]string, 0, len(links))
 	for k, _ := range links {
@@ -115,7 +116,7 @@ func (m *Memory) GetLinkStat(link string) (uint64, error) {
 	defer m.mu.Unlock()
 	var useCounter, ok = m.StatsByKey[link]
 	if !ok {
-		return 0, ErrNotExist
+		return 0, link2.ErrNotExist
 	}
 	return useCounter, nil
 }

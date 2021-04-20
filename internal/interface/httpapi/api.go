@@ -1,21 +1,22 @@
-package api
+package httpapi
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"koro.che/usecases"
+	"koro.che/internal/usecases/account"
+	"koro.che/internal/usecases/link"
 	"net/http"
 	"time"
 )
 
 type Api struct {
-	AccountUseCases usecases.AccountUseCasesInterface
-	LinkUseCases    usecases.LinkUseCasesInterface
+	AccountUseCases account.AccountUseCasesInterface
+	LinkUseCases    link.LinkUseCasesInterface
 }
 
-func NewApi(a usecases.AccountUseCasesInterface, l usecases.LinkUseCasesInterface) *Api {
+func NewApi(a account.AccountUseCasesInterface, l link.LinkUseCasesInterface) *Api {
 	return &Api{
 		AccountUseCases: a,
 		LinkUseCases:    l,
@@ -103,7 +104,7 @@ func (a *Api) login(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 	}
-
+	http.SetCookie(writer, &http.Cookie{Name: "token", Value: token})
 	writer.Header().Set("Content-Type", "application/jwt")
 	if _, err := writer.Write([]byte(token)); err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -128,7 +129,7 @@ func (a *Api) logout(writer http.ResponseWriter, request *http.Request) {
 func (a *Api) redirectToRealLink(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
 	if link, err := a.LinkUseCases.MakeRedirect(vars["key"]); err == nil {
-		http.Redirect(writer, request, "https://" + link, http.StatusMovedPermanently)
+		http.Redirect(writer, request, "https://"+link, http.StatusMovedPermanently)
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
 	}

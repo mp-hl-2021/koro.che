@@ -1,10 +1,10 @@
-package api
+package httpapi
 
 import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"koro.che/usecases"
+	"koro.che/internal/usecases/account"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,18 +12,18 @@ import (
 
 type AccountUseCasesFake struct{}
 
-func (AccountUseCasesFake) CreateAccount(login, password string) (usecases.Account, error) {
+func (AccountUseCasesFake) CreateAccount(login, password string) (account.Account, error) {
 	switch login {
 	case "test":
-		return usecases.Account{
+		return account.Account{
 			Id: "test_id",
 		}, nil
 	default:
-		return usecases.Account{}, errors.New("failed to create an account")
+		return account.Account{}, errors.New("failed to create an account")
 	}
 }
 
-func (AccountUseCasesFake) GetAccountById(id string) (usecases.Account, error) {
+func (AccountUseCasesFake) GetAccountById(id string) (account.Account, error) {
 	panic("implement me")
 }
 

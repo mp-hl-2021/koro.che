@@ -1,15 +1,20 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
+	"fmt"
 	"io/ioutil"
-	"koro.che/accountstorage"
-	"koro.che/api"
-	"koro.che/auth"
-	"koro.che/linkstorage"
-	"koro.che/usecases"
+	auth2 "koro.che/internal/auth"
+	"koro.che/internal/interface/httpapi"
+	"koro.che/internal/interface/postgres/accountrepo"
+	"koro.che/internal/interface/postgres/linkrepo"
+	"koro.che/internal/usecases/account"
+	"koro.che/internal/usecases/link"
 	"net/http"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -20,21 +25,29 @@ func main() {
 
 	privateKeyBytes, err := ioutil.ReadFile(*privateKeyPath)
 	publicKeyBytes, err := ioutil.ReadFile(*publicKeyPath)
-	a, err := auth.NewToken(privateKeyBytes, publicKeyBytes, 100*time.Minute)
+	a, err := auth2.NewToken(privateKeyBytes, publicKeyBytes, 100*time.Minute)
 	if err != nil {
 		panic(err)
 	}
-	accountUseCases := usecases.AccountUseCases{
-		AccountStorage: accountstorage.NewMemory(),
+
+	connStr := "user=postgres password=12345678 port=5432 host=db dbname=postgres sslmode=disable"
+
+	conn, err := sql.Open("postgres", connStr)
+	if err != nil {
+		panic(fmt.Sprintf("Couldn't connect to DB: %v", err))
+	}
+
+	accountUseCases := account.AccountUseCases{
+		AccountStorage: accountrepo.New(conn),
 		Auth:           a,
 	}
-	linkUseCases := usecases.LinkUseCases{
-		LinkStorage: linkstorage.NewMemory(),
+	linkUseCases := link.LinkUseCases{
+		LinkStorage: linkrepo.New(conn),
 	}
-	service := api.NewApi(&accountUseCases, &linkUseCases)
+	service := httpapi.NewApi(&accountUseCases, &linkUseCases)
 
 	server := http.Server{
-		Addr:         "localhost:8080",
+		Addr:         ":8080",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		Handler:      service.Router(),

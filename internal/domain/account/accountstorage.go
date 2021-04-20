@@ -1,4 +1,4 @@
-package accountstorage
+package account
 
 import "errors"
 
