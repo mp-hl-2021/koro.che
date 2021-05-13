@@ -21,6 +21,13 @@ services:
     volumes:
       - ./initdb.sql:/docker-entrypoint-initdb.d/initdb.sql
       - database-data:/var/lib/postgres/data
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
 volumes:
   database-data:
 
