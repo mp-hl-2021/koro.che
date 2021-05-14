@@ -27,7 +27,8 @@ func NewApi(a account.AccountUseCasesInterface, l link.LinkUseCasesInterface) *A
 
 func (a *Api) Router() http.Handler {
 	router := mux.NewRouter()
-
+	router.Use(prom.Measurer())
+	router.Handle("/metrics", promhttp.Handler())
 	router.HandleFunc("/api/register", a.register).Methods(http.MethodPost)
 	router.HandleFunc("/api/login", a.login).Methods(http.MethodPut)
 	router.HandleFunc("/api/logout", a.authorize(a.logout)).Methods(http.MethodPut)
@@ -37,9 +38,6 @@ func (a *Api) Router() http.Handler {
 	router.HandleFunc("/api/manage/{key}", a.authorize(a.deleteLink)).Methods(http.MethodDelete)
 	router.HandleFunc("/api/manage/links", a.authorize(a.getUserLinks)).Methods(http.MethodGet)
 	router.HandleFunc("/api/manage/stats", a.authorize(a.getUserLinkStats)).Methods(http.MethodGet)
-
-	router.Handle("/metrics", promhttp.Handler())
-	router.Use(prom.Measurer())
 
 	return router
 }

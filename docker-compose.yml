@@ -24,6 +24,8 @@ services:
 
   prometheus:
     image: prom/prometheus
+    depends_on:
+      - server
     ports:
       - 9090:9090
     volumes:
