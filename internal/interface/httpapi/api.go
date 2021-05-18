@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"koro.che/internal/interface/prom"
 	"koro.che/internal/usecases/account"
 	"koro.che/internal/usecases/link"
 	"net/http"
@@ -14,18 +18,22 @@ import (
 type Api struct {
 	AccountUseCases account.AccountUseCasesInterface
 	LinkUseCases    link.LinkUseCasesInterface
+	Logger zerolog.Logger
 }
 
 func NewApi(a account.AccountUseCasesInterface, l link.LinkUseCasesInterface) *Api {
 	return &Api{
 		AccountUseCases: a,
 		LinkUseCases:    l,
+		Logger: log.With().Str("module", "http-server").Logger(),
 	}
 }
 
 func (a *Api) Router() http.Handler {
 	router := mux.NewRouter()
-
+	router.Use(prom.Measurer())
+	router.Use(a.logger)
+	router.Handle("/metrics", promhttp.Handler())
 	router.HandleFunc("/api/register", a.register).Methods(http.MethodPost)
 	router.HandleFunc("/api/login", a.login).Methods(http.MethodPut)
 	router.HandleFunc("/api/logout", a.authorize(a.logout)).Methods(http.MethodPut)
@@ -237,4 +245,42 @@ func (a *Api) getUserLinkStats(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+type responseWriterObserver struct {
+	http.ResponseWriter
+	status int
+	wroteHeader bool
+}
+
+func (o *responseWriterObserver) WriteHeader(code int) {
+	o.ResponseWriter.WriteHeader(code)
+	if o.wroteHeader {
+		return
+	}
+	o.wroteHeader = true
+	o.status = code
+}
+
+func (o *responseWriterObserver) StatusCode() int {
+	if !o.wroteHeader {
+		return http.StatusOK
+	}
+	return o.status
+}
+
+func (a *Api) logger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		o := &responseWriterObserver{ResponseWriter: w}
+		next.ServeHTTP(o, r)
+		a.Logger.Info().
+					Str("method", r.Method).
+					Str("url", r.URL.String()).
+					Str("protocol", r.Proto).
+					Int("status-code", o.StatusCode()).
+					Str("remote-addr", r.RemoteAddr).
+					Dur("duration", time.Since(start)).
+					Msg("")
+	})
 }
