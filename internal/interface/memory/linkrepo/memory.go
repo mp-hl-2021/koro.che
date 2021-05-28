@@ -7,18 +7,18 @@ import (
 )
 
 type Memory struct {
-	linkByKey  map[string]string
-	StatsByKey map[string]uint64
+	linkByKey       map[string]string
+	StatsByKey      map[string]uint64
 	userToLinksKeys map[string]map[string]bool
-	mu         *sync.Mutex
+	mu              *sync.Mutex
 }
 
 func NewMemory() *Memory {
 	return &Memory{
-		linkByKey:  make(map[string]string),
-		StatsByKey: make(map[string]uint64),
+		linkByKey:       make(map[string]string),
+		StatsByKey:      make(map[string]uint64),
 		userToLinksKeys: make(map[string]map[string]bool),
-		mu:         &sync.Mutex{},
+		mu:              &sync.Mutex{},
 	}
 }
 
@@ -71,7 +71,7 @@ func (m *Memory) MakeRedirect(key string) (string, error) {
 	if link == "" {
 		err = link2.ErrNotExist
 	}
-	if err!= nil {
+	if err != nil {
 		return "", err
 	}
 	m.StatsByKey[key] += 1
@@ -97,16 +97,23 @@ func (m *Memory) DeleteLink(key string, userId string) (string, error) {
 	return link, err
 }
 
-func (m *Memory) GetUserLinks(userId string) ([]string, error) {
+func (m *Memory) GetUserLinks(userId string) ([]link2.UserLink, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var links, ok = m.userToLinksKeys[userId]
 	if !ok {
-		return []string{}, link2.ErrNotExist
+		return []link2.UserLink{}, link2.ErrNotExist
 	}
-	keys := make([]string, 0, len(links))
+	keys := make([]link2.UserLink, 0, len(links))
 	for k, _ := range links {
-		keys = append(keys, k)
+		realLink, ok := m.linkByKey[k]
+		if !ok {
+			return []link2.UserLink{}, link2.ErrNotExist
+		}
+		keys = append(keys, link2.UserLink{
+			ShortenLink: k,
+			RealLink:    realLink,
+		})
 	}
 	return keys, nil
 }
