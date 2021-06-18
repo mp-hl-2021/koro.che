@@ -55,7 +55,7 @@ const queryDeleteLink = `
 `
 
 const queryUserLinks = `
-	select key from links
+	select key, real_link from links
 	where creator_id = $1
 `
 
@@ -72,7 +72,7 @@ func (p *Postgres) CreateShortLink(link string, userId string) (string, error) {
 		err := row.Scan()
 		if err == sql.ErrNoRows {
 			p.conn.QueryRow(queryCreateLink, userId, link, key)
-		    // todo need wrapping???
+			// todo need wrapping???
 			break
 		}
 	}
@@ -118,18 +118,19 @@ func (p *Postgres) DeleteLink(key string, userId string) (string, error) {
 	return realLink, err
 }
 
-func (p *Postgres) GetUserLinks(userId string) ([]string, error) {
-	var userLinks = make([]string, 0)
+func (p *Postgres) GetUserLinks(userId string) ([]link2.UserLink, error) {
+	var userLinks = make([]link2.UserLink, 0)
 	rows, err := p.conn.Query(queryUserLinks, userId)
 	if err != nil {
 		return nil, err
 	}
 	for rows.Next() {
-		var link string
-		if err := rows.Scan(&link); err != nil {
+		var shortLink string
+		var realLink string
+		if err := rows.Scan(&shortLink, &realLink); err != nil {
 			return nil, err
 		}
-		userLinks = append(userLinks, link)
+		userLinks = append(userLinks, link2.UserLink{ShortenLink: shortLink, RealLink: realLink})
 	}
 	return userLinks, nil
 }

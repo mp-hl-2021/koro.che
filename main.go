@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"koro.che/internal/usecases/account"
 	"koro.che/internal/usecases/link"
 	"net/http"
+	"os"
+	"os/signal"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -44,7 +47,21 @@ func main() {
 	linkUseCases := link.LinkUseCases{
 		LinkStorage: linkrepo.New(conn),
 	}
-	service := httpapi.NewApi(&accountUseCases, &linkUseCases)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
+	defer func() {
+		signal.Stop(signalChan)
+		cancel()
+	}()
+	go func() {
+		select {
+		case <-signalChan:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	service := httpapi.NewApi(ctx, &accountUseCases, &linkUseCases)
 
 	server := http.Server{
 		Addr:         ":8080",

@@ -3,29 +3,36 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	link2 "koro.che/internal/domain/link"
 	"koro.che/internal/interface/prom"
 	"koro.che/internal/usecases/account"
 	"koro.che/internal/usecases/link"
 	"net/http"
+	"net/url"
+	"os"
+	"sync"
 	"time"
 )
 
 type Api struct {
 	AccountUseCases account.AccountUseCasesInterface
 	LinkUseCases    link.LinkUseCasesInterface
-	Logger zerolog.Logger
+	Logger          zerolog.Logger
+	Ctx             context.Context
 }
 
-func NewApi(a account.AccountUseCasesInterface, l link.LinkUseCasesInterface) *Api {
+func NewApi(ctx context.Context, a account.AccountUseCasesInterface, l link.LinkUseCasesInterface) *Api {
 	return &Api{
 		AccountUseCases: a,
 		LinkUseCases:    l,
-		Logger: log.With().Str("module", "http-server").Logger(),
+		Logger:          log.With().Str("module", "http-server").Logger(),
+		Ctx:             ctx,
 	}
 }
 
@@ -136,8 +143,8 @@ func (a *Api) logout(writer http.ResponseWriter, request *http.Request) {
 
 func (a *Api) redirectToRealLink(writer http.ResponseWriter, request *http.Request) {
 	vars := mux.Vars(request)
-	if link, err := a.LinkUseCases.MakeRedirect(vars["key"]); err == nil {
-		http.Redirect(writer, request, "https://"+link, http.StatusMovedPermanently)
+	if lnk, err := a.LinkUseCases.MakeRedirect(vars["key"]); err == nil {
+		http.Redirect(writer, request, "https://"+lnk, http.StatusMovedPermanently)
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
 	}
@@ -150,8 +157,8 @@ type linkModel struct {
 func (a *Api) getRealLink(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	vars := mux.Vars(request)
-	if link, err := a.LinkUseCases.GetRealLink(vars["key"]); err == nil {
-		o := linkModel{Link: link}
+	if lnk, err := a.LinkUseCases.GetRealLink(vars["key"]); err == nil {
+		o := linkModel{Link: lnk}
 		if err := json.NewEncoder(writer).Encode(o); err != nil {
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
@@ -216,15 +223,135 @@ func (a *Api) deleteLink(writer http.ResponseWriter, request *http.Request) {
 	writer.WriteHeader(http.StatusOK)
 }
 
+func urlChecker(ctx context.Context, in <-chan string, out chan<- bool, stop <-chan struct{}) error {
+	for {
+		select {
+		case <-stop:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		case u, ok := <-in:
+			if !ok {
+				return nil
+			}
+			flag, err := checkUrl(ctx, u)
+			if err != nil {
+				return err
+			}
+			out <- flag
+		}
+	}
+}
+
+func checkUrl(ctx context.Context, urlStr string) (bool, error) {
+	c := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		if e, ok := err.(*url.Error); ok {
+			if e.Timeout() || e.Temporary() {
+				return false, nil
+			} else {
+				return false, err
+			}
+		} else {
+			return false, err
+		}
+	}
+	if resp != nil {
+		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			return false, nil
+		} else {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+const (
+	urlsConcurrency = 4
+)
+
+func getLinksAvailability(ctx context.Context, urls []string) ([]bool, error) {
+	stopChan := make(chan struct{})
+	errChan := make(chan string, urlsConcurrency)
+	urlsChan := make(chan string)
+	availabilitiesChan := make(chan bool, urlsConcurrency)
+	go func() {
+		for _, u := range urls {
+			urlsChan <- u
+		}
+		close(urlsChan)
+	}()
+	var wg sync.WaitGroup
+	wg.Add(urlsConcurrency)
+	for i := 0; i < urlsConcurrency; i++ {
+		go func(ctx context.Context, in <-chan string, out chan<- bool, stop <-chan struct{}) {
+			err := urlChecker(ctx, in, out, stop)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "error url checking")
+				errChan <- err.Error()
+			}
+			wg.Done()
+		}(ctx, urlsChan, availabilitiesChan, stopChan)
+	}
+
+	availabilities := make([]bool, 0)
+
+	for {
+		if len(availabilities) == len(urls) {
+			close(stopChan)
+			break
+		}
+		select {
+		case e := <-errChan:
+			close(stopChan)
+			return []bool{}, errors.New(e)
+		case <-ctx.Done():
+			break
+		case b := <-availabilitiesChan:
+			availabilities = append(availabilities, b)
+		}
+	}
+	wg.Wait()
+	return availabilities, nil
+}
+
+type UserLinkResponse struct {
+	Link      string `json:"link"`
+	Available bool   `json:"available"`
+}
+
 func (a *Api) getUserLinks(w http.ResponseWriter, r *http.Request) {
-	var links []string
+	var links []link2.UserLink
 	userId := r.Context().Value("account_id").(string)
 	links, err := a.LinkUseCases.GetUserLinks(userId)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if err := json.NewEncoder(w).Encode(links); err != nil {
+	realLinks := make([]string, len(links))
+	for i, lnk := range links {
+		realLinks[i] = lnk.RealLink
+	}
+	availabilities, err := getLinksAvailability(a.Ctx, realLinks)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	resp := make([]UserLinkResponse, len(links))
+	for i := 0; i < len(links); i++ {
+		resp[i] = UserLinkResponse{Link: links[i].ShortenLink, Available: availabilities[i]}
+	}
+
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -249,7 +376,7 @@ func (a *Api) getUserLinkStats(w http.ResponseWriter, r *http.Request) {
 
 type responseWriterObserver struct {
 	http.ResponseWriter
-	status int
+	status      int
 	wroteHeader bool
 }
 
@@ -275,12 +402,12 @@ func (a *Api) logger(next http.Handler) http.Handler {
 		o := &responseWriterObserver{ResponseWriter: w}
 		next.ServeHTTP(o, r)
 		a.Logger.Info().
-					Str("method", r.Method).
-					Str("url", r.URL.String()).
-					Str("protocol", r.Proto).
-					Int("status-code", o.StatusCode()).
-					Str("remote-addr", r.RemoteAddr).
-					Dur("duration", time.Since(start)).
-					Msg("")
+			Str("method", r.Method).
+			Str("url", r.URL.String()).
+			Str("protocol", r.Proto).
+			Int("status-code", o.StatusCode()).
+			Str("remote-addr", r.RemoteAddr).
+			Dur("duration", time.Since(start)).
+			Msg("")
 	})
 }
