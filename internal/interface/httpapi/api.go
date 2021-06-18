@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"sync"
 	"time"
 )
@@ -25,13 +24,15 @@ type Api struct {
 	AccountUseCases account.AccountUseCasesInterface
 	LinkUseCases    link.LinkUseCasesInterface
 	Logger          zerolog.Logger
+	Ctx             context.Context
 }
 
-func NewApi(a account.AccountUseCasesInterface, l link.LinkUseCasesInterface) *Api {
+func NewApi(ctx context.Context, a account.AccountUseCasesInterface, l link.LinkUseCasesInterface) *Api {
 	return &Api{
 		AccountUseCases: a,
 		LinkUseCases:    l,
 		Logger:          log.With().Str("module", "http-server").Logger(),
+		Ctx:             ctx,
 	}
 }
 
@@ -277,23 +278,9 @@ const (
 	urlsConcurrency = 4
 )
 
-func getLinksAvailability(urls []string) ([]bool, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalChan := make(chan os.Signal, 1)
+func getLinksAvailability(ctx context.Context, urls []string) ([]bool, error) {
 	stopChan := make(chan struct{})
 	errChan := make(chan string, urlsConcurrency)
-	signal.Notify(signalChan, os.Interrupt)
-	defer func() {
-		signal.Stop(signalChan)
-		cancel()
-	}()
-	go func() {
-		select {
-		case <-signalChan:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
 	urlsChan := make(chan string)
 	availabilitiesChan := make(chan bool, urlsConcurrency)
 	go func() {
@@ -324,7 +311,7 @@ func getLinksAvailability(urls []string) ([]bool, error) {
 		}
 		select {
 		case e := <-errChan:
-			cancel()
+			close(stopChan)
 			return []bool{}, errors.New(e)
 		case <-ctx.Done():
 			break
@@ -353,8 +340,7 @@ func (a *Api) getUserLinks(w http.ResponseWriter, r *http.Request) {
 	for i, lnk := range links {
 		realLinks[i] = lnk.RealLink
 	}
-	availabilities, err := getLinksAvailability(realLinks)
-
+	availabilities, err := getLinksAvailability(a.Ctx, realLinks)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
